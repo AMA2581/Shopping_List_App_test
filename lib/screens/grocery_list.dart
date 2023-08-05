@@ -32,42 +32,46 @@ class _GroceriesScreenState extends State<GroceriesScreen> {
       'shopping-list.json',
     );
 
-    final response = await http.get(url);
+    try {
+      final response = await http.get(url);
 
-    if (response.statusCode >= 400) {
+      if (response.statusCode >= 400) {
+        setState(() {
+          _errorCode = response.statusCode;
+          _isLoading = false;
+        });
+      }
+
+      if (response.body == 'null') {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final Map<String, dynamic> listData = json.decode(response.body);
+      final List<GroceryItem> loadedItems = [];
+      for (final item in listData.entries) {
+        final category = categories.entries
+            .firstWhere(
+                (catItem) => catItem.value.title == item.value['category'])
+            .value;
+        loadedItems.add(
+          GroceryItem(
+            id: item.key,
+            name: item.value['name'],
+            quantity: item.value['quantity'],
+            category: category,
+          ),
+        );
+      }
       setState(() {
-        _errorCode = response.statusCode;
+        _groceryItems = loadedItems;
         _isLoading = false;
       });
+    } catch (error) {
+      _errorCode = 1;
     }
-
-    if (response.body == 'null'){
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final Map<String, dynamic> listData = json.decode(response.body);
-    final List<GroceryItem> loadedItems = [];
-    for (final item in listData.entries) {
-      final category = categories.entries
-          .firstWhere(
-              (catItem) => catItem.value.title == item.value['category'])
-          .value;
-      loadedItems.add(
-        GroceryItem(
-          id: item.key,
-          name: item.value['name'],
-          quantity: item.value['quantity'],
-          category: category,
-        ),
-      );
-    }
-    setState(() {
-      _groceryItems = loadedItems;
-      _isLoading = false;
-    });
   }
 
   void _addItem() async {
@@ -130,6 +134,8 @@ class _GroceriesScreenState extends State<GroceriesScreen> {
 
   @override
   Widget build(BuildContext context) {
+
+    // No Grocery
     Widget content = Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -163,6 +169,7 @@ class _GroceriesScreenState extends State<GroceriesScreen> {
       );
     }
 
+    // Code errors
     if (_errorCode != null) {
       content = Center(
         child: Column(
@@ -186,6 +193,31 @@ class _GroceriesScreenState extends State<GroceriesScreen> {
       );
     }
 
+    // No internet connection error
+    if (_errorCode == 1) {
+      content = Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'No Internet Connection',
+              style: Theme.of(context).textTheme.headlineLarge!.copyWith(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Something went wrong',
+              style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // List of Groceries
     if (_groceryItems.isNotEmpty) {
       content = ListView.builder(
         itemCount: _groceryItems.length,
