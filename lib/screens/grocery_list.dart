@@ -18,6 +18,7 @@ class GroceriesScreen extends StatefulWidget {
 class _GroceriesScreenState extends State<GroceriesScreen> {
   List<GroceryItem> _groceryItems = [];
   var _isLoading = true;
+  int? _errorCode;
 
   @override
   void initState() {
@@ -32,6 +33,20 @@ class _GroceriesScreenState extends State<GroceriesScreen> {
     );
 
     final response = await http.get(url);
+
+    if (response.statusCode >= 400) {
+      setState(() {
+        _errorCode = response.statusCode;
+        _isLoading = false;
+      });
+    }
+
+    if (response.body == 'null'){
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
 
     final Map<String, dynamic> listData = json.decode(response.body);
     final List<GroceryItem> loadedItems = [];
@@ -71,26 +86,46 @@ class _GroceriesScreenState extends State<GroceriesScreen> {
     });
   }
 
-  void _removeGrocery(GroceryItem groceryItem) {
+  void _removeGrocery(GroceryItem groceryItem) async {
     final groceryItemIndex = _groceryItems.indexOf(groceryItem);
+    final url = Uri.https(
+        'shopping-list-test-flutt-f7226-default-rtdb.firebaseio.com',
+        'shopping-list/${groceryItem.id}.json');
+
     setState(() {
       _groceryItems.remove(groceryItem);
     });
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 3),
-        content: const Text('Expense deleted.'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () {
-            setState(() {
-              _groceryItems.insert(groceryItemIndex, groceryItem);
-            });
-          },
+
+    final response = await http.delete(url);
+    if (response.statusCode >= 400) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          content: Text('${response.statusCode} Something went wrong'),
         ),
-      ),
-    );
+      );
+      setState(() {
+        _groceryItems.insert(groceryItemIndex, groceryItem);
+      });
+    } else {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          duration: const Duration(seconds: 3),
+          content: const Text('Expense deleted.'),
+          // action: SnackBarAction(
+          //   label: 'Undo',
+          //   onPressed: () {
+          //     setState(() {
+          //       _groceryItems.insert(groceryItemIndex, groceryItem);
+          //     });
+          //     return;
+          //   },
+          // ),
+        ),
+      );
+    }
   }
 
   @override
@@ -125,6 +160,29 @@ class _GroceriesScreenState extends State<GroceriesScreen> {
     if (_isLoading) {
       content = const Center(
         child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_errorCode != null) {
+      content = Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _errorCode.toString(),
+              style: Theme.of(context).textTheme.headlineLarge!.copyWith(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Something went wrong',
+              style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  ),
+            ),
+          ],
+        ),
       );
     }
 
